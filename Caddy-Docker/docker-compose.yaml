@@ -1,0 +1,25 @@
+# Docker Compose for Caddy Webserver
+
+services:
+  caddy:
+    image: caddy:latest
+    container_name: caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - $PWD/Caddyfile:/etc/caddy/Caddyfile
+      - $PWD/site:/srv
+      - $PWD/caddy_data:/data
+      - $PWD/caddy_config:/config
+    networks:
+      - caddy-net
+
+volumes:
+  caddy_data:
+  caddy_config:
+networks:
+  caddy-net:
+    driver: bridge
