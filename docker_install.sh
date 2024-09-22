@@ -4,6 +4,7 @@ sudo apt update && sudo apt upgrade -y
 # Install Docker
 sudo apt-get update
 sudo apt install apt-transport-https ca-certificates curl software-properties-common
+sudo apt install docker.io
 sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 sudo systemctl start docker
 sudo systemctl enable docker
