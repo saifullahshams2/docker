@@ -1,7 +1,6 @@
 #!/bin/bash
 # Update & Upgrade
 sudo apt update && sudo apt upgrade -y
-
 # Install Docker
 sudo apt-get update
 sudo apt-get install ca-certificates curl
@@ -13,14 +12,10 @@ echo \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
-
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin -y
 # Install Portainer for Docker Portainer will be in Port :9000
-
 docker volume create portainer_data
 docker run -d -p 9000:9000 --name portainer --restart=always -v /var/run/docker.sock:/var/run/docker.sock -v portainer_data:/data portainer/portainer-ce:latest
-
 # Install Caddy Docker
 docker network create -d bridge caddy-net
 docker volume create caddy_data
