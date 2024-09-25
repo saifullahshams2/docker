@@ -13,4 +13,4 @@ services:
           - MINIO_ROOT_USER=admin
           - MINIO_ROOT_PASSWORD=password
       image: quay.io/minio/minio
-      command: server /data --console-address ":9001" --address ":9000"
+      command: server /data --console-address ":9001" --address ":9002"
