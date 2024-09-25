@@ -8,7 +8,7 @@ services:
           - 9002:9002
       container_name: minio
       volumes:
-          - $PWD/minio/data:/data
+          - $PWD/data:/data
       environment:
           - MINIO_ROOT_USER=admin
           - MINIO_ROOT_PASSWORD=password
