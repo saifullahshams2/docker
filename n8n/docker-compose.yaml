@@ -9,4 +9,7 @@ services:
           - GENERIC_TIMEZONE=Asia/Kuwait
         volumes:
           - /root/n8n/n8n_data:/home/node/.n8n
+        restart: always
+        networks:
+          - bridge
         image: docker.n8n.io/n8nio/n8n
