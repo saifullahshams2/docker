@@ -1,14 +1,16 @@
+# Install Minio Docker Container
+
 name: minio
 services:
     minio:
       ports:
           - 9001:9001
-          - 9000:9000
+          - 9002:9002
       container_name: minio
       volumes:
-          - $PWD/minio/data:/data
+          - $PWD/data:/data
       environment:
           - MINIO_ROOT_USER=admin
           - MINIO_ROOT_PASSWORD=password
       image: quay.io/minio/minio
-      command: server /data --console-address ":9001" --address ":9000"
+      command: server /data --console-address ":9001" --address ":9002"
