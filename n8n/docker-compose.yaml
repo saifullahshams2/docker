@@ -8,8 +8,13 @@ services:
           - WEBHOOK_URL=n8n.zendev.one
           - GENERIC_TIMEZONE=Asia/Kuwait
         volumes:
-          - /root/n8n/n8n_data:/home/node/.n8n
+          - $PWD/n8n_data:/home/node/.n8n
         restart: always
         networks:
-          - bridge
+          - n8n-net
+          - caddy-net
+
+networks:
+  n8n-net:
+    driver: bridge
         image: docker.n8n.io/n8nio/n8n

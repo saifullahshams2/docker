@@ -16,10 +16,6 @@ services:
       - $PWD/caddy_config:/config
     networks:
       - caddy-net
-
-volumes:
-  caddy_data:
-  caddy_config:
 networks:
   caddy-net:
     driver: bridge
