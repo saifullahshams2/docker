@@ -7,6 +7,7 @@ services:
         environment:
           - WEBHOOK_URL=n8n.zendev.one
           - GENERIC_TIMEZONE=Asia/Kuwait
+          - N8N_PROTOCOL=https
         volumes:
           - $PWD/n8n_data:/home/node/.n8n
         restart: always
