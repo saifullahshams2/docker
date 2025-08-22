@@ -1,21 +1,24 @@
 version: "3"
 services:
-      n8n:
-        container_name: n8n
-        ports:
-          - 5678:5678
-        environment:
-          - WEBHOOK_URL=n8n.zendev.one
-          - GENERIC_TIMEZONE=Asia/Kuwait
-          - N8N_PROTOCOL=https
-        volumes:
-          - $PWD/n8n_data:/home/node/.n8n
-        restart: always
-        networks:
-          - n8n-net
-          - caddy-net
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: n8n
+    ports:
+      - 5678:5678
+    environment:
+      - WEBHOOK_URL=n8n.zendev.one
+      - GENERIC_TIMEZONE=Asia/Riyadh
+      - N8N_PROTOCOL=https
+    volumes:
+      - $PWD/n8n_data:/home/node/.n8n
+    restart: always
+    networks:
+      - n8n-net
+      - caddynet
 
 networks:
   n8n-net:
     driver: bridge
-        image: docker.n8n.io/n8nio/n8n
+  caddynet:
+    driver: bridge
+    external: true
