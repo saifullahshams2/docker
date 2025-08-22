@@ -5,6 +5,8 @@ services:
     container_name: gluetun
     cap_add:
       - NET_ADMIN
+    networks:
+      - caddynet
     devices:
       - /dev/net/tun:/dev/net/tun
     ports:
@@ -19,9 +21,6 @@ services:
       - WIREGUARD_PRIVATE_KEY=wOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=
       - WIREGUARD_PRESHARED_KEY=xOEI9rqqbDwnN8/Bpp22sVz48T71vJ4fYmFWujulwUU=
       - WIREGUARD_ADDRESSES=10.64.222.21/32
-    network:
-      - caddynet
-      - firefox
  
   # Firefox container using Gluetun for VPN
   firefox:
@@ -41,9 +40,6 @@ services:
       - FIREFOX_CLI=https://www.linuxserver.io/ #optional
     volumes:
       - firefox:/config
-    networks:
-      - firefox
-      - caddynet
     shm_size: "5gb"
     restart: always
 
