@@ -12,7 +12,7 @@ services:
     volumes:
       - $PWD/Caddyfile:/etc/caddy/Caddyfile
     networks:
-      - caddy-net
+      - caddynet
 networks:
-  caddy-net:
+  caddynet:
     driver: bridge
