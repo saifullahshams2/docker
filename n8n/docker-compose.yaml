@@ -13,12 +13,13 @@ services:
       - $PWD/n8n_data:/home/node/.n8n
     restart: always
     networks:
-      - n8n-net
+      - n8nnet
       - caddynet
 
 networks:
-  n8n-net:
+  n8nnet:
     driver: bridge
+    name: n8nnet 
   caddynet:
     driver: bridge
     external: true
