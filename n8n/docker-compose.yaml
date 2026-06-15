@@ -6,7 +6,7 @@ services:
     ports:
       - 5678:5678
     environment:
-      - WEBHOOK_URL=n8n.zendev.one
+      - WEBHOOK_URL=(add domain)
       - GENERIC_TIMEZONE=Asia/Riyadh
       - N8N_PROTOCOL=https
     volumes:
