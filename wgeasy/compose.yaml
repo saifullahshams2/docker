@@ -10,6 +10,7 @@ services:
     container_name: wg-easy
     networks:
       - wg
+      - caddynet
     volumes:
       - ./etc_wireguard:/etc/wireguard
       - /lib/modules:/lib/modules:ro
@@ -30,3 +31,6 @@ networks:
   wg:
     driver: bridge
     name: wg
+  caddynet:
+    driver: bridge
+    external: true
