@@ -12,7 +12,7 @@ services:
       - wg
       - caddynet
     volumes:
-      - ./etc_wireguard:/etc/wireguard
+      - ./etc:/etc/wireguard
       - /lib/modules:/lib/modules:ro
     ports:
       - "51820:51820/udp"

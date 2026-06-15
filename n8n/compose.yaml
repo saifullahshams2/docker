@@ -10,7 +10,7 @@ services:
       - GENERIC_TIMEZONE=Asia/Riyadh
       - N8N_PROTOCOL=https
     volumes:
-      - $PWD/n8n_data:/home/node/.n8n
+      - ./data:/home/node/.n8n
     restart: always
     networks:
       - n8nnet
