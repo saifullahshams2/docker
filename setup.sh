@@ -38,16 +38,47 @@ print_header() {
     echo -e "${CYAN}=====================================================${NC}\n"
 }
 
-# ------------------------------------------------------------------------------
-# 1. Root & OS Verification
-# ------------------------------------------------------------------------------
-if [ "$EUID" -ne 0 ]; then
-    print_error "Please run this script as root or using sudo: sudo bash setup.sh"
-    exit 1
+# Attach stdin to terminal for interactive prompts if script is piped (e.g. curl | bash)
+if [ ! -t 0 ] && [ -e /dev/tty ]; then
+    exec < /dev/tty
 fi
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# ------------------------------------------------------------------------------
+# 1. Privilege Verification & Elevation (Root / Sudo)
+# ------------------------------------------------------------------------------
+if [ "$EUID" -ne 0 ]; then
+    if ! command -v sudo &> /dev/null; then
+        print_error "This script requires superuser privileges and 'sudo' was not found."
+        print_error "Please install sudo or run this script as root directly."
+        exit 1
+    fi
+    print_info "Superuser privileges required. Elevating with sudo..."
+    if [ -f "${BASH_SOURCE[0]}" ] && [[ "${BASH_SOURCE[0]}" != "/dev/fd/"* ]]; then
+        exec sudo -E bash "${BASH_SOURCE[0]}" "$@"
+    else
+        exec sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/saifullahshams2/docker/main/setup.sh)" -- "$@"
+    fi
+fi
+
+# Resolve Script Directory
+if [ -n "${BASH_SOURCE[0]}" ] && [ -f "${BASH_SOURCE[0]}" ] && [[ "${BASH_SOURCE[0]}" != "/dev/fd/"* ]]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+else
+    SCRIPT_DIR="/opt/docker"
+fi
+mkdir -p "$SCRIPT_DIR"
 cd "$SCRIPT_DIR"
+
+# Ensure repository stack files exist locally (for curl | bash one-liner support)
+if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
+    print_info "Stack directory files not found locally. Fetching repository files..."
+    apt-get update -y && apt-get install -y git curl
+    TMP_CLONE_DIR="$(mktemp -d)"
+    git clone https://github.com/saifullahshams2/docker.git "$TMP_CLONE_DIR"
+    cp -r "$TMP_CLONE_DIR/"* "$SCRIPT_DIR/"
+    rm -rf "$TMP_CLONE_DIR"
+    print_success "Repository files successfully initialized at $SCRIPT_DIR."
+fi
 
 print_header "Step 1: Package Update & Docker Installation"
 
