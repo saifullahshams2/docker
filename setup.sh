@@ -117,13 +117,26 @@ if ! command -v docker &> /dev/null; then
     print_info "Docker not found. Installing Docker and Docker Compose..."
     sudo apt-get install -y ca-certificates curl gnupg lsb-release
     
-    # Use official Docker install script
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    rm -f get-docker.sh
+    INSTALL_SUCCESS=false
+
+    # Attempt 1: Official Docker install script
+    if curl -fsSL https://get.docker.com -o get-docker.sh; then
+        if sudo sh get-docker.sh; then
+            INSTALL_SUCCESS=true
+        fi
+        rm -f get-docker.sh
+    fi
     
-    sudo systemctl enable docker
-    sudo systemctl start docker
+    # Attempt 2 (Fallback): If official script failed (e.g. unsupported distro codename), install Ubuntu native docker.io packages
+    if [ "$INSTALL_SUCCESS" = false ]; then
+        print_warning "Official Docker repository failed (likely unsupported distro codename). Falling back to native OS packages..."
+        sudo rm -f /etc/apt/sources.list.d/docker.list
+        sudo apt-get update -y
+        sudo apt-get install -y docker.io docker-compose-v2 || sudo apt-get install -y docker.io docker-compose-plugin || sudo apt-get install -y docker.io
+    fi
+    
+    sudo systemctl enable docker || true
+    sudo systemctl start docker || true
     print_success "Docker installed and started successfully."
 else
     print_success "Docker is already installed ($(docker --version))."
@@ -132,7 +145,7 @@ fi
 # Ensure docker compose plugin is available
 if ! sudo docker compose version &> /dev/null; then
     print_info "Installing Docker Compose plugin..."
-    sudo apt-get install -y docker-compose-plugin
+    sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-compose-v2 || true
 fi
 print_success "Docker Compose is ready: $(sudo docker compose version)"
 
