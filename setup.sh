@@ -396,16 +396,7 @@ if [[ "$SETUP_WGEASY" =~ ^[Yy]$ ]]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 7. System Upgrade (Ran at the end)
-# ------------------------------------------------------------------------------
-print_header "Step 5: System Package Upgrade"
-print_info "Running system upgrade..."
-wait_for_apt_lock
-sudo apt-get upgrade -y
-print_success "System upgrade completed."
-
-# ------------------------------------------------------------------------------
-# 8. Final Summary
+# 7. Final Summary
 # ------------------------------------------------------------------------------
 print_header "Deployment Complete!"
 
@@ -443,3 +434,17 @@ fi
 echo -e "  • ${CYAN}Installation Log${NC}: ${LOG_FILE}"
 
 echo -e "\n${GREEN}All services are up and running!${NC}\n"
+
+# ------------------------------------------------------------------------------
+# 8. Optional System Reboot Prompt
+# ------------------------------------------------------------------------------
+REBOOT_SYSTEM="n"
+read -rp "$(echo -e "${YELLOW}Do you want to reboot the system now to apply all group and kernel changes? (y/n) [default: n]: ${NC}")" REBOOT_SYSTEM || true
+REBOOT_SYSTEM=${REBOOT_SYSTEM:-n}
+
+if [[ "$REBOOT_SYSTEM" =~ ^[Yy]$ ]]; then
+    print_info "Rebooting system now..."
+    sudo reboot
+else
+    print_info "Reboot skipped. You can manually reboot anytime with: sudo reboot"
+fi

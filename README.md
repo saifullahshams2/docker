@@ -93,7 +93,7 @@ When you run `setup.sh`, it executes the following 6 stages:
    - Prompts for your preferred timezone for n8n (defaults to `Asia/Riyadh`).
    - Generates updated `compose.yaml` files and `caddy/Caddyfile`.
 5. **Container Orchestration**: Launches each chosen service cleanly in the background (`docker compose up -d`).
-6. **System Upgrade & Summary**: Runs `apt-get upgrade -y` to keep OS packages secure, then outputs a table with all live URLs and endpoints.
+6. **Summary & Optional Reboot**: Outputs a table with all live URLs, logs the session to `setup.log`, and prompts to reboot the system to apply group/kernel permissions.
 
 ---
 
