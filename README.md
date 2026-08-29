@@ -11,14 +11,12 @@ Automatically installs **Docker Engine & Docker Compose**, creates a unified bri
 Run this single command on your Ubuntu/Debian server as a regular user with `sudo` permissions:
 
 ```bash
-mkdir -p docker && curl -fsSL https://github.com/saifullahshams2/docker/archive/refs/heads/main.tar.gz | tar -xz -C docker --strip-components=1 && cd docker && bash setup.sh
+(command -v git >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y git)) && (test -d docker || git clone https://github.com/saifullahshams2/docker.git) && cd docker && bash setup.sh
 ```
 
-> **Alternative via Git Clone:**
+> **Simpler alternative (if git is already installed):**
 > ```bash
-> git clone https://github.com/saifullahshams2/docker.git
-> cd docker
-> bash setup.sh
+> git clone https://github.com/saifullahshams2/docker.git && cd docker && bash setup.sh
 > ```
 
 ---
