@@ -57,14 +57,14 @@ fi
 # 1.2 Get current username
 CURRENT_USER=$(whoami)
 
-# 1.3 Check if user belongs to 'sudo' (Debian/Ubuntu) or 'wheel' (RHEL/CentOS) group
-if ! id -nG "$CURRENT_USER" | grep -qwE "(sudo|wheel)"; then
-    print_error "User '$CURRENT_USER' is not in the 'sudo' or 'wheel' group."
-    print_error "You must be a member of the sudo group to run this script. Exiting..."
+# 1.3 Check if user belongs to 'sudo', 'wheel', or 'root' group
+if ! id -nG "$CURRENT_USER" | grep -qwE "(sudo|wheel|root)"; then
+    print_error "User '$CURRENT_USER' is not in the 'sudo', 'wheel', or 'root' group."
+    print_error "You must be a member of an administrative group (sudo, wheel, or root) to run this script. Exiting..."
     exit 1
 fi
 
-print_success "User '$CURRENT_USER' is authorized in sudo group."
+print_success "User '$CURRENT_USER' is authorized in an administrative group."
 
 # 1.4 Validate & cache sudo credentials upfront
 print_info "Authenticating sudo access..."
@@ -79,7 +79,7 @@ SUDO_KEEPALIVE_PID=$!
 trap 'kill $SUDO_KEEPALIVE_PID 2>/dev/null || true' EXIT
 
 # ------------------------------------------------------------------------------
-# 2. Resolve Script Directory & Workspace Setup
+# 2. Resolve Script Directory, Logging & Workspace Setup
 # ------------------------------------------------------------------------------
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ] && [[ "${BASH_SOURCE[0]:-}" != "/dev/fd/"* ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -91,6 +91,11 @@ fi
 sudo mkdir -p "$SCRIPT_DIR"
 sudo chown -R "$CURRENT_USER:$(id -gn "$CURRENT_USER")" "$SCRIPT_DIR"
 cd "$SCRIPT_DIR"
+
+# Enable logging: saves full output to setup.log in the current directory while displaying on screen
+LOG_FILE="$SCRIPT_DIR/setup.log"
+exec > >(tee -a "$LOG_FILE") 2>&1
+print_info "Logging all session output to $LOG_FILE"
 
 # Ensure repository stack files exist locally (for curl | bash one-liner support)
 if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
@@ -381,5 +386,7 @@ if [[ "$SETUP_WGEASY" =~ ^[Yy]$ ]]; then
         echo -e "  • ${CYAN}WG-Easy Web UI${NC}: http://127.0.0.1:51821"
     fi
 fi
+
+echo -e "  • ${CYAN}Installation Log${NC}: ${LOG_FILE}"
 
 echo -e "\n${GREEN}All services are up and running!${NC}\n"
