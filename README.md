@@ -8,7 +8,7 @@ Automatically installs **Docker Engine & Docker Compose**, creates a unified bri
 
 ## ⚡ Quick Start (One-Command Installer)
 
-Run this single command on your Ubuntu/Debian server as `root` or any user with `sudo` privileges:
+Run this single command on your Ubuntu/Debian server as a regular user belonging to the `sudo` group:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/saifullahshams2/docker/main/setup.sh | bash

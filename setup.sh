@@ -5,7 +5,7 @@
 # Supports: Caddy, Portainer, n8n, WG-Easy (WireGuard)
 # ==============================================================================
 
-set -e
+set -euo pipefail
 
 # Colors for terminal output
 RED='\033[0;31m'
@@ -44,35 +44,58 @@ if [ ! -t 0 ] && [ -e /dev/tty ]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 1. Privilege Verification & Elevation (Root / Sudo)
+# 1. Privilege & Group Verification (Option 2: Disallow Root, Check Sudo Group)
 # ------------------------------------------------------------------------------
-if [ "$EUID" -ne 0 ]; then
-    if ! command -v sudo &> /dev/null; then
-        print_error "This script requires superuser privileges and 'sudo' was not found."
-        print_error "Please install sudo or run this script as root directly."
-        exit 1
-    fi
-    print_info "Superuser privileges required. Elevating with sudo..."
-    if [ -f "${BASH_SOURCE[0]}" ] && [[ "${BASH_SOURCE[0]}" != "/dev/fd/"* ]]; then
-        exec sudo -E bash "${BASH_SOURCE[0]}" "$@"
-    else
-        exec sudo -E bash -c "$(curl -fsSL https://raw.githubusercontent.com/saifullahshams2/docker/main/setup.sh)" -- "$@"
-    fi
+
+# 1.1 Disallow running directly as root
+if [ "$EUID" -eq 0 ]; then
+    print_error "Do not run this script directly as root or with 'sudo ./setup.sh'."
+    print_error "Please run it as a regular user: ./setup.sh"
+    exit 1
 fi
 
-# Resolve Script Directory
-if [ -n "${BASH_SOURCE[0]}" ] && [ -f "${BASH_SOURCE[0]}" ] && [[ "${BASH_SOURCE[0]}" != "/dev/fd/"* ]]; then
+# 1.2 Get current username
+CURRENT_USER=$(whoami)
+
+# 1.3 Check if user belongs to 'sudo' (Debian/Ubuntu) or 'wheel' (RHEL/CentOS) group
+if ! id -nG "$CURRENT_USER" | grep -qwE "(sudo|wheel)"; then
+    print_error "User '$CURRENT_USER' is not in the 'sudo' or 'wheel' group."
+    print_error "You must be a member of the sudo group to run this script. Exiting..."
+    exit 1
+fi
+
+print_success "User '$CURRENT_USER' is authorized in sudo group."
+
+# 1.4 Validate & cache sudo credentials upfront
+print_info "Authenticating sudo access..."
+if ! sudo -v; then
+    print_error "Sudo authentication failed. Exiting..."
+    exit 1
+fi
+
+# Keep sudo session alive in the background while the script runs
+while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+SUDO_KEEPALIVE_PID=$!
+trap 'kill $SUDO_KEEPALIVE_PID 2>/dev/null || true' EXIT
+
+# ------------------------------------------------------------------------------
+# 2. Resolve Script Directory & Workspace Setup
+# ------------------------------------------------------------------------------
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]:-}" ] && [[ "${BASH_SOURCE[0]:-}" != "/dev/fd/"* ]]; then
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 else
     SCRIPT_DIR="/opt/docker"
 fi
-mkdir -p "$SCRIPT_DIR"
+
+# Ensure target directory exists and is owned by current user
+sudo mkdir -p "$SCRIPT_DIR"
+sudo chown -R "$CURRENT_USER:$(id -gn "$CURRENT_USER")" "$SCRIPT_DIR"
 cd "$SCRIPT_DIR"
 
 # Ensure repository stack files exist locally (for curl | bash one-liner support)
 if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
     print_info "Stack directory files not found locally. Fetching repository files..."
-    apt-get update -y && apt-get install -y git curl
+    sudo apt-get update -y && sudo apt-get install -y git curl
     TMP_CLONE_DIR="$(mktemp -d)"
     git clone https://github.com/saifullahshams2/docker.git "$TMP_CLONE_DIR"
     cp -r "$TMP_CLONE_DIR/"* "$SCRIPT_DIR/"
@@ -80,50 +103,53 @@ if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
     print_success "Repository files successfully initialized at $SCRIPT_DIR."
 fi
 
+# ------------------------------------------------------------------------------
+# 3. Package Update & Docker Installation
+# ------------------------------------------------------------------------------
 print_header "Step 1: Package Update & Docker Installation"
 
 print_info "Updating package lists..."
-apt-get update -y
+sudo apt-get update -y
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     print_info "Docker not found. Installing Docker and Docker Compose..."
-    apt-get install -y ca-certificates curl gnupg lsb-release
+    sudo apt-get install -y ca-certificates curl gnupg lsb-release
     
     # Use official Docker install script
     curl -fsSL https://get.docker.com -o get-docker.sh
-    sh get-docker.sh
+    sudo sh get-docker.sh
     rm -f get-docker.sh
     
-    systemctl enable docker
-    systemctl start docker
+    sudo systemctl enable docker
+    sudo systemctl start docker
     print_success "Docker installed and started successfully."
 else
     print_success "Docker is already installed ($(docker --version))."
 fi
 
 # Ensure docker compose plugin is available
-if ! docker compose version &> /dev/null; then
+if ! sudo docker compose version &> /dev/null; then
     print_info "Installing Docker Compose plugin..."
-    apt-get install -y docker-compose-plugin
+    sudo apt-get install -y docker-compose-plugin
 fi
-print_success "Docker Compose is ready: $(docker compose version)"
+print_success "Docker Compose is ready: $(sudo docker compose version)"
 
 # ------------------------------------------------------------------------------
-# 2. Network Setup
+# 4. Network Setup
 # ------------------------------------------------------------------------------
 print_header "Step 2: Shared Docker Network Setup"
 
-if ! docker network inspect caddynet &> /dev/null; then
+if ! sudo docker network inspect caddynet &> /dev/null; then
     print_info "Creating external bridge network: caddynet"
-    docker network create caddynet
+    sudo docker network create caddynet
     print_success "Network 'caddynet' created."
 else
     print_success "Network 'caddynet' already exists."
 fi
 
 # ------------------------------------------------------------------------------
-# 3. Interactive Configuration Prompts
+# 5. Interactive Configuration Prompts
 # ------------------------------------------------------------------------------
 print_header "Step 3: Service Configuration"
 
@@ -141,16 +167,16 @@ WG_DOMAIN=""
 CADDYFILE_CONTENT=""
 
 # CADDY QUESTION
-read -rp "$(echo -e "${YELLOW}Do you want to setup Caddy Webserver (Reverse Proxy / SSL)? (y/n) [default: y]: ${NC}")" SETUP_CADDY
+read -rp "$(echo -e "${YELLOW}Do you want to setup Caddy Webserver (Reverse Proxy / SSL)? (y/n) [default: y]: ${NC}")" SETUP_CADDY || true
 SETUP_CADDY=${SETUP_CADDY:-y}
 
 # PORTAINER QUESTION
-read -rp "$(echo -e "${YELLOW}Do you want to setup Portainer (Container Management UI)? (y/n) [default: y]: ${NC}")" SETUP_PORTAINER
+read -rp "$(echo -e "${YELLOW}Do you want to setup Portainer (Container Management UI)? (y/n) [default: y]: ${NC}")" SETUP_PORTAINER || true
 SETUP_PORTAINER=${SETUP_PORTAINER:-y}
 
 if [[ "$SETUP_PORTAINER" =~ ^[Yy]$ ]]; then
     if [[ "$SETUP_CADDY" =~ ^[Yy]$ ]]; then
-        read -rp "$(echo -e "${YELLOW}Enter the domain for Portainer (e.g. portainer.example.com) [leave blank to skip Caddy proxy]: ${NC}")" PORTAINER_DOMAIN
+        read -rp "$(echo -e "${YELLOW}Enter the domain for Portainer (e.g. portainer.example.com) [leave blank to skip Caddy proxy]: ${NC}")" PORTAINER_DOMAIN || true
         if [ -n "$PORTAINER_DOMAIN" ]; then
             CADDYFILE_CONTENT+="${PORTAINER_DOMAIN} {
     reverse_proxy portainer:9000
@@ -162,12 +188,12 @@ if [[ "$SETUP_PORTAINER" =~ ^[Yy]$ ]]; then
 fi
 
 # N8N QUESTION
-read -rp "$(echo -e "${YELLOW}Do you want to setup n8n (Workflow Automation)? (y/n) [default: y]: ${NC}")" SETUP_N8N
+read -rp "$(echo -e "${YELLOW}Do you want to setup n8n (Workflow Automation)? (y/n) [default: y]: ${NC}")" SETUP_N8N || true
 SETUP_N8N=${SETUP_N8N:-y}
 
 if [[ "$SETUP_N8N" =~ ^[Yy]$ ]]; then
-    read -rp "$(echo -e "${YELLOW}Enter the domain / Webhook URL domain for n8n (e.g. n8n.example.com): ${NC}")" N8N_DOMAIN
-    read -rp "$(echo -e "${YELLOW}Enter timezone for n8n [default: Asia/Riyadh]: ${NC}")" INPUT_TZ
+    read -rp "$(echo -e "${YELLOW}Enter the domain / Webhook URL domain for n8n (e.g. n8n.example.com): ${NC}")" N8N_DOMAIN || true
+    read -rp "$(echo -e "${YELLOW}Enter timezone for n8n [default: Asia/Riyadh]: ${NC}")" INPUT_TZ || true
     if [ -n "$INPUT_TZ" ]; then
         N8N_TIMEZONE="$INPUT_TZ"
     fi
@@ -180,6 +206,7 @@ if [[ "$SETUP_N8N" =~ ^[Yy]$ ]]; then
     fi
 
     print_info "Writing n8n configuration..."
+    mkdir -p "$SCRIPT_DIR/n8n"
     cat <<EOF > "$SCRIPT_DIR/n8n/compose.yaml"
 services:
   n8n:
@@ -217,12 +244,12 @@ EOF
 fi
 
 # WG-EASY QUESTION
-read -rp "$(echo -e "${YELLOW}Do you want to setup WG-Easy (WireGuard VPN)? (y/n) [default: y]: ${NC}")" SETUP_WGEASY
+read -rp "$(echo -e "${YELLOW}Do you want to setup WG-Easy (WireGuard VPN)? (y/n) [default: y]: ${NC}")" SETUP_WGEASY || true
 SETUP_WGEASY=${SETUP_WGEASY:-y}
 
 if [[ "$SETUP_WGEASY" =~ ^[Yy]$ ]]; then
     if [[ "$SETUP_CADDY" =~ ^[Yy]$ ]]; then
-        read -rp "$(echo -e "${YELLOW}Enter domain for WG-Easy Web Dashboard (e.g. wg.example.com) [leave blank to skip Caddy proxy]: ${NC}")" WG_DOMAIN
+        read -rp "$(echo -e "${YELLOW}Enter domain for WG-Easy Web Dashboard (e.g. wg.example.com) [leave blank to skip Caddy proxy]: ${NC}")" WG_DOMAIN || true
         if [ -n "$WG_DOMAIN" ]; then
             CADDYFILE_CONTENT+="${WG_DOMAIN} {
     reverse_proxy wg-easy:51821
@@ -233,6 +260,7 @@ if [[ "$SETUP_WGEASY" =~ ^[Yy]$ ]]; then
     fi
 
     print_info "Writing wg-easy configuration..."
+    mkdir -p "$SCRIPT_DIR/wgeasy"
     cat <<EOF > "$SCRIPT_DIR/wgeasy/compose.yaml"
 services:
   wg-easy:
@@ -274,6 +302,7 @@ fi
 # Write Caddyfile if Caddy is enabled
 if [[ "$SETUP_CADDY" =~ ^[Yy]$ ]]; then
     print_info "Writing caddy/Caddyfile..."
+    mkdir -p "$SCRIPT_DIR/caddy"
     if [ -z "$CADDYFILE_CONTENT" ]; then
         CADDYFILE_CONTENT="# Add your reverse proxy domains here\n"
     fi
@@ -281,44 +310,44 @@ if [[ "$SETUP_CADDY" =~ ^[Yy]$ ]]; then
 fi
 
 # ------------------------------------------------------------------------------
-# 4. Service Deployment
+# 6. Service Deployment
 # ------------------------------------------------------------------------------
 print_header "Step 4: Launching Selected Containers"
 
 if [[ "$SETUP_CADDY" =~ ^[Yy]$ ]]; then
     print_info "Starting Caddy..."
-    (cd "$SCRIPT_DIR/caddy" && docker compose up -d)
+    (cd "$SCRIPT_DIR/caddy" && sudo docker compose up -d)
     print_success "Caddy is running."
 fi
 
 if [[ "$SETUP_PORTAINER" =~ ^[Yy]$ ]]; then
     print_info "Starting Portainer..."
-    (cd "$SCRIPT_DIR/portainer" && docker compose up -d)
+    (cd "$SCRIPT_DIR/portainer" && sudo docker compose up -d)
     print_success "Portainer is running."
 fi
 
 if [[ "$SETUP_N8N" =~ ^[Yy]$ ]]; then
     print_info "Starting n8n..."
-    (cd "$SCRIPT_DIR/n8n" && docker compose up -d)
+    (cd "$SCRIPT_DIR/n8n" && sudo docker compose up -d)
     print_success "n8n is running."
 fi
 
 if [[ "$SETUP_WGEASY" =~ ^[Yy]$ ]]; then
     print_info "Starting WG-Easy..."
-    (cd "$SCRIPT_DIR/wgeasy" && docker compose up -d)
+    (cd "$SCRIPT_DIR/wgeasy" && sudo docker compose up -d)
     print_success "WG-Easy is running."
 fi
 
 # ------------------------------------------------------------------------------
-# 5. System Upgrade (Ran at the end)
+# 7. System Upgrade (Ran at the end)
 # ------------------------------------------------------------------------------
 print_header "Step 5: System Package Upgrade"
 print_info "Running system upgrade..."
-apt-get upgrade -y
+sudo apt-get upgrade -y
 print_success "System upgrade completed."
 
 # ------------------------------------------------------------------------------
-# 6. Final Summary
+# 8. Final Summary
 # ------------------------------------------------------------------------------
 print_header "Deployment Complete!"
 
