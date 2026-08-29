@@ -97,14 +97,10 @@ LOG_FILE="$SCRIPT_DIR/setup.log"
 exec > >(tee -a "$LOG_FILE") 2>&1
 print_info "Logging all session output to $LOG_FILE"
 
-# Ensure repository stack files exist locally (for curl | bash one-liner support)
+# Ensure repository stack files exist locally (for one-liner curl / script execution)
 if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
     print_info "Stack directory files not found locally. Fetching repository files..."
-    sudo apt-get update -y && sudo apt-get install -y git curl
-    TMP_CLONE_DIR="$(mktemp -d)"
-    git clone https://github.com/saifullahshams2/docker.git "$TMP_CLONE_DIR"
-    cp -r "$TMP_CLONE_DIR/"* "$SCRIPT_DIR/"
-    rm -rf "$TMP_CLONE_DIR"
+    curl -fsSL https://github.com/saifullahshams2/docker/archive/refs/heads/main.tar.gz | tar -xz -C "$SCRIPT_DIR" --strip-components=1
     print_success "Repository files successfully initialized at $SCRIPT_DIR."
 fi
 
