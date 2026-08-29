@@ -104,33 +104,63 @@ if [ ! -d "$SCRIPT_DIR/caddy" ] || [ ! -d "$SCRIPT_DIR/portainer" ]; then
     print_success "Repository files successfully initialized at $SCRIPT_DIR."
 fi
 
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a
+
+# Wait for background apt locks to release (e.g. unattended-upgrades on boot)
+wait_for_apt_lock() {
+    local max_wait=60
+    local waited=0
+    while sudo fuser /var/lib/dpkg/lock-frontend /var/lib/apt/lists/lock /var/lib/dpkg/lock >/dev/null 2>&1; do
+        if [ "$waited" -ge "$max_wait" ]; then
+            print_warning "Apt lock is still held. Attempting to continue..."
+            break
+        fi
+        print_info "Waiting for background system updates / apt lock to release..."
+        sleep 3
+        waited=$((waited + 3))
+    done
+}
+
 # ------------------------------------------------------------------------------
 # 3. Package Update & Docker Installation
 # ------------------------------------------------------------------------------
 print_header "Step 1: Package Update & Docker Installation"
 
+wait_for_apt_lock
 print_info "Updating package lists..."
 sudo apt-get update -y
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then
     print_info "Docker not found. Installing Docker and Docker Compose..."
+    wait_for_apt_lock
     sudo apt-get install -y ca-certificates curl gnupg lsb-release
     
     INSTALL_SUCCESS=false
 
-    # Attempt 1: Official Docker install script
-    if curl -fsSL https://get.docker.com -o get-docker.sh; then
-        if sudo sh get-docker.sh; then
+    # Set up official Docker GPG key and repository
+    print_info "Configuring Docker repository..."
+    sudo install -m 0755 -d /etc/apt/keyrings
+    sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+    UBUNTU_CODENAME="$(. /etc/os-release && echo "${VERSION_CODENAME:-$UBUNTU_CODENAME}")"
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu ${UBUNTU_CODENAME} stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+    wait_for_apt_lock
+    if sudo apt-get update -y; then
+        print_info "Installing Docker CE packages (this may take 1-2 minutes)..."
+        if sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin; then
             INSTALL_SUCCESS=true
         fi
-        rm -f get-docker.sh
     fi
     
-    # Attempt 2 (Fallback): If official script failed (e.g. unsupported distro codename), install Ubuntu native docker.io packages
+    # Fallback: If Docker official repository fails (e.g. unsupported distro codename), install Ubuntu native packages
     if [ "$INSTALL_SUCCESS" = false ]; then
-        print_warning "Official Docker repository failed (likely unsupported distro codename). Falling back to native OS packages..."
+        print_warning "Official Docker repository unavailable. Installing Ubuntu native docker.io packages..."
         sudo rm -f /etc/apt/sources.list.d/docker.list
+        wait_for_apt_lock
         sudo apt-get update -y
         sudo apt-get install -y docker.io docker-compose-v2 || sudo apt-get install -y docker.io docker-compose-plugin || sudo apt-get install -y docker.io
     fi
@@ -357,6 +387,7 @@ fi
 # ------------------------------------------------------------------------------
 print_header "Step 5: System Package Upgrade"
 print_info "Running system upgrade..."
+wait_for_apt_lock
 sudo apt-get upgrade -y
 print_success "System upgrade completed."
 
