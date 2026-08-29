@@ -179,6 +179,16 @@ if ! sudo docker compose version &> /dev/null; then
 fi
 print_success "Docker Compose is ready: $(sudo docker compose version)"
 
+# Ensure 'docker' group exists and add current user to it
+sudo groupadd -f docker
+if ! id -nG "$CURRENT_USER" | grep -qw "docker"; then
+    print_info "Adding '$CURRENT_USER' to the docker group..."
+    sudo usermod -aG docker "$CURRENT_USER"
+    print_success "User '$CURRENT_USER' successfully added to the 'docker' group."
+else
+    print_success "User '$CURRENT_USER' is already a member of the 'docker' group."
+fi
+
 # ------------------------------------------------------------------------------
 # 4. Network Setup
 # ------------------------------------------------------------------------------
@@ -250,12 +260,15 @@ if [[ "$SETUP_N8N" =~ ^[Yy]$ ]]; then
     fi
 
     print_info "Writing n8n configuration..."
-    mkdir -p "$SCRIPT_DIR/n8n"
+    mkdir -p "$SCRIPT_DIR/n8n/data"
+    sudo chown -R 1000:1000 "$SCRIPT_DIR/n8n/data"
+
     cat <<EOF > "$SCRIPT_DIR/n8n/compose.yaml"
 services:
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: n8n
+    user: "1000:1000"
     ports:
       - "127.0.0.1:5678:5678"
     environment:
