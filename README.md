@@ -123,78 +123,20 @@ When `setup.sh` is executed:
 
 ---
 
-## 🔧 Operational & Management Guide
+## 🔑 Portainer Initial Setup & Token
 
-Each service is modular and located in its own directory. Manage individual services using standard Docker Compose commands:
-
-### Start / Stop / Restart Services
-
-```bash
-# Navigate to the service folder
-cd caddy      # or n8n, portainer, wgeasy
-
-# Check status
-docker compose ps
-
-# View live logs
-docker compose logs -f
-
-# Restart service
-docker compose restart
-
-# Stop service
-docker compose down
-
-# Start service in background
-docker compose up -d
-```
-
----
-
-### Updating Containers to Latest Versions
-
-```bash
-cd /path/to/docker/n8n
-docker compose pull
-docker compose up -d
-```
-
----
-
-### Adding New Reverse Proxy Domains to Caddy
-
-To proxy any new service or website with automatic SSL:
-
-1. Open `caddy/Caddyfile`:
-   ```bash
-   nano caddy/Caddyfile
-   ```
-2. Add your domain block:
-   ```caddy
-   app.yourdomain.com {
-       reverse_proxy container_name:port
-   }
-   ```
-3. Reload Caddy without downtime:
-   ```bash
-   docker exec -w /etc/caddy caddy caddy reload
-   ```
-
----
-
-## 💡 Post-Installation Notes & Tips
-
-- **Portainer Initial Setup**: Open `https://portainer.yourdomain.com` (or `http://SERVER_IP:9000` via SSH tunnel) immediately after installation to set up your primary admin account before the setup window times out.
-- **WireGuard Configuration**:
-  - To configure your public server IP for client configs, set `- WG_HOST=YOUR_PUBLIC_IP` in `wgeasy/compose.yaml`.
-  - To set an admin password for the web dashboard, set `PASSWORD` or `PASSWORD_HASH` in `wgeasy/compose.yaml`.
-- **Applying Group Changes**: If running Docker commands without `sudo` returns a permission denied error, log out and log back in, or run:
+- **Get Setup Token**: During the initial Portainer setup, a security setup token is required. Run the following command to view your token from the logs:
   ```bash
-  newgrp docker
+  sudo docker logs portainer
+  ```
+- **Setup Timeout**: If you exceed the initial setup time limit and are locked out of creating the admin user, restart the Portainer container to reset the setup window:
+  ```bash
+  sudo docker restart portainer
   ```
 
 ---
 
 ## 📄 License
 
-This project is licensed under the [MIT License](LICENSE).
+This project was completely created by AI and is distributed under the [MIT License](LICENSE).
+
