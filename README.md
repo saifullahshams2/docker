@@ -1,99 +1,106 @@
-# 🚀 Docker & Services Automated Server Stack
+# 🚀 Automated Docker & Microservices Server Stack
 
-An interactive, automated bash deployment suite to turn a fresh Ubuntu/Debian VPS into a production-ready containerized environment in minutes.
+An automated, resilient, and interactive Bash deployment suite designed to transform any fresh Ubuntu/Debian server into a secure, production-grade containerized environment in minutes.
 
-Automatically installs **Docker Engine & Docker Compose**, creates a unified bridge network (`caddynet`), interactively configures SSL reverse-proxying with **Caddy**, and provisions self-hosted tools: **Portainer**, **n8n**, and **WG-Easy (WireGuard VPN)**.
+Automatically provisions **Docker Engine & Docker Compose**, establishes an isolated bridge network (`caddynet`), interactively configures automatic HTTPS reverse proxying with **Caddy**, and deploys self-hosted services: **Portainer CE**, **n8n**, and **WG-Easy (WireGuard VPN)**.
 
 ---
 
-## ⚡ Quick Start (One-Command Installer)
+## ⚡ Quick Start
 
-Run this single command on your Ubuntu/Debian server as a regular user with `sudo` permissions:
+### Prerequisites
+- **Operating System**: Ubuntu 20.04 / 22.04 / 24.04 LTS or Debian 11 / 12.
+- **User Account**: Run as a regular user with `sudo` group permissions (*do not run directly as root*).
+- **DNS (A/AAAA Records)**: Point your domain/subdomains to your server's public IP before setup if configuring SSL reverse proxying.
+- **Firewall Ports**:
+  - `80/tcp` & `443/tcp` / `443/udp` (HTTP/HTTPS & HTTP/3 for Caddy)
+  - `51820/udp` (WireGuard VPN tunnel traffic, if using WG-Easy)
+
+---
+
+### One-Line Automated Installation
+
+Run the following command in your terminal:
 
 ```bash
 (command -v git >/dev/null 2>&1 || (sudo apt-get update -y && sudo apt-get install -y git)) && (test -d docker || git clone https://github.com/saifullahshams2/docker.git) && cd docker && bash setup.sh
 ```
 
-> **Simpler alternative (if git is already installed):**
+> **Note for Root-only VPS users:**
+> If your VPS provider only gave you `root` access, create and switch to a sudo-enabled user first:
 > ```bash
-> git clone https://github.com/saifullahshams2/docker.git && cd docker && bash setup.sh
+> adduser deploy
+> usermod -aG sudo deploy
+> su - deploy
 > ```
 
 ---
 
-## 📦 What's Included?
+## 📦 Service Catalog
 
-| Service | Category | Container Name | Internal Port | Local Binding | Public Exposure (via Caddy) |
+| Service | Role | Container Name | Internal Port | Host Binding | Public Exposure |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **[Caddy](https://caddyserver.com/)** | Reverse Proxy & SSL | `caddy` | `80`, `443` | `0.0.0.0:80`, `0.0.0.0:443` | Automatic HTTPS & ACME certs |
-| **[Portainer CE](https://www.portainer.io/)** | Container Management UI | `portainer` | `9000` | `127.0.0.1:9000` | `https://portainer.yourdomain.com` |
-| **[n8n](https://n8n.io/)** | Workflow Automation | `n8n` | `5678` | `127.0.0.1:5678` | `https://n8n.yourdomain.com` |
-| **[WG-Easy](https://github.com/wg-easy/wg-easy)** | WireGuard VPN + Web UI | `wg-easy` | `51820/udp`, `51821` | `0.0.0.0:51820/udp`, `127.0.0.1:51821` | `https://vpn.yourdomain.com` |
+| **[Caddy](https://caddyserver.com/)** | Edge Reverse Proxy & Automatic SSL | `caddy` | `80`, `443` | `0.0.0.0:80`<br>`0.0.0.0:443` | Auto HTTPS via Let's Encrypt / ZeroSSL |
+| **[Portainer CE](https://www.portainer.io/)** | Docker Container Management UI | `portainer` | `9000` | `127.0.0.1:9000` | `https://portainer.yourdomain.com` |
+| **[n8n](https://n8n.io/)** | Low-Code Workflow Automation | `n8n` | `5678` | `127.0.0.1:5678` | `https://n8n.yourdomain.com` |
+| **[WG-Easy](https://github.com/wg-easy/wg-easy)** | WireGuard VPN + Management Web UI | `wg-easy` | `51820/udp`<br>`51821/tcp` | `0.0.0.0:51820/udp`<br>`127.0.0.1:51821` | `https://vpn.yourdomain.com` |
 
 ---
 
 ## 🏗️ Architecture & Network Flow
 
-```
-                                  [ Internet / Users ]
-                                           |
-                                  +--------+--------+
-                                  | Ports 80 & 443  |
-                                  v                 v
-                 +----------------------------------------------------+
-                 |               Caddy Reverse Proxy                  |
-                 |             (Automatic SSL via ACME)               |
-                 +------------------------+---------------------------+
-                                          |
-                        [ Shared Network: 'caddynet' ]
-                                          |
-             +----------------------------+----------------------------+
-             |                            |                            |
-             v                            v                            v
-   +--------------------+      +--------------------+      +--------------------+
-   |   Portainer CE     |      |       n8n          |      |      WG-Easy       |
-   |   (portainer:9000) |      |    (n8n:5678)      |      |  (wg-easy:51821)   |
-   +--------------------+      +--------------------+      +---------+----------+
-                                                                     | (Port 51820/udp)
-                                                                     v
-                                                            [ WireGuard Clients ]
+```text
+                                  [ Internet / Clients ]
+                                             |
+                                    +--------+--------+
+                                    | Ports 80 & 443  |
+                                    v                 v
+                   +----------------------------------------------------+
+                   |               Caddy Reverse Proxy                  |
+                   |             (Automatic SSL via ACME)               |
+                   +------------------------+---------------------------+
+                                            |
+                         [ External Docker Network: 'caddynet' ]
+                                            |
+               +----------------------------+----------------------------+
+               |                            |                            |
+               v                            v                            v
+     +--------------------+      +--------------------+      +--------------------+
+     |   Portainer CE     |      |       n8n          |      |      WG-Easy       |
+     |   (portainer:9000) |      |    (n8n:5678)      |      |  (wg-easy:51821)   |
+     +--------------------+      +--------------------+      +---------+----------+
+                                                                       | (Port 51820/udp)
+                                                                       v
+                                                              [ WireGuard Clients ]
 ```
 
-* **Zero Direct Public Exposure**: Back-end service ports (`9000`, `5678`, `51821`) are bound to `127.0.0.1` on the host, preventing bypass of reverse-proxy authentication and HTTPS.
-* **Service Discovery**: Containers communicate internally across the `caddynet` bridge by container name.
+### Design Principles:
+1. **Loopback Port Binding**: Application ports (`9000`, `5678`, `51821`) bind to `127.0.0.1` (localhost), routing external web traffic through Caddy reverse proxy.
+2. **Container Isolation**: Applications run in individual Docker Compose stacks with dedicated bridge networks (`n8nnet`, `wg`, `portainer_network`) while connected to `caddynet` for reverse proxying.
+3. **Dedicated User Context**: n8n runs under `user: "1000:1000"` with matching file permissions on `./data`.
+4. **Session Keepalive**: `setup.sh` maintains a background keep-alive process during setup that automatically terminates on exit.
+5. **Apt Lock Resilience**: Automatically waits for background package update locks to release before proceeding.
 
 ---
 
-## 📋 Prerequisites & DNS Configuration
+## 🛠️ Interactive Installation Walkthrough
 
-1. **Operating System**: Ubuntu 20.04/22.04/24.04 LTS or Debian 11/12.
-2. **User Privileges**: `root` or a user with `sudo` permissions (the script auto-elevates when required).
-3. **Firewall Ports**: Ensure the following incoming ports are allowed in your cloud provider / VPS firewall:
-   - `80/tcp` (HTTP - required for ACME certificate verification)
-   - `443/tcp` & `443/udp` (HTTPS & HTTP/3)
-   - `51820/udp` (WireGuard VPN tunnel traffic, if using WG-Easy)
-4. **DNS Records (A/AAAA)**:
-   Point your domain/subdomains to your server's public IP before running the installer so Caddy can automatically issue TLS certificates:
-   - `portainer.yourdomain.com` ➔ `YOUR_SERVER_IP`
-   - `n8n.yourdomain.com` ➔ `YOUR_SERVER_IP`
-   - `vpn.yourdomain.com` ➔ `YOUR_SERVER_IP`
+When `setup.sh` is executed:
 
----
-
-## 🛠️ Step-by-Step Installation Flow
-
-When you run `setup.sh`, it executes the following 6 stages:
-
-1. **Privilege & Environment Check**: Confirms superuser privileges and attaches standard terminal I/O for interactive menus.
-2. **Docker Engine & Plugin Setup**: Checks if Docker is installed; if missing, installs Docker Engine and `docker-compose-plugin` using Docker's official repositories.
-3. **Network Creation**: Creates the external Docker bridge network `caddynet`.
-4. **Interactive Prompts**:
-   - Asks which services you want to deploy (`y/n`).
-   - Prompts for your public domains for Caddy reverse-proxying.
-   - Prompts for your preferred timezone for n8n (defaults to `Asia/Riyadh`).
-   - Generates updated `compose.yaml` files and `caddy/Caddyfile`.
-5. **Container Orchestration**: Launches each chosen service cleanly in the background (`docker compose up -d`).
-6. **Summary & Optional Reboot**: Outputs a table with all live URLs, logs the session to `setup.log`, and prompts to reboot the system to apply group/kernel permissions.
+1. **Permission Validation**: Confirms non-root execution and verifies administrative group membership.
+2. **Environment & Logging**: Directs all terminal logs to `setup.log` while displaying real-time output.
+3. **Docker Engine Installation**:
+   - Detects existing Docker instances.
+   - If missing, registers Docker's official GPG key and repository and installs `docker-ce`, `containerd.io`, and `docker-compose-plugin`.
+   - Adds the current user to the `docker` group.
+4. **Shared Network**: Creates the external Docker network `caddynet`.
+5. **Interactive Service Configuration**:
+   - **Caddy**: Choose whether to deploy Caddy as your reverse proxy.
+   - **Portainer**: Prompts for custom domain name (e.g., `portainer.yourdomain.com`).
+   - **n8n**: Prompts for domain name and timezone (defaults to `Asia/Riyadh`). Automatically configures webhook URLs and sets permissions on `./n8n/data`.
+   - **WG-Easy**: Prompts for custom domain name for the WireGuard dashboard.
+6. **Orchestration**: Launches selected containers in detached mode (`docker compose up -d`).
+7. **Summary & Verification**: Prints access URLs and provides an option to reboot the server.
 
 ---
 
@@ -101,59 +108,93 @@ When you run `setup.sh`, it executes the following 6 stages:
 
 ```text
 .
-├── setup.sh                 # Interactive master installation & provisioning script
-├── README.md                # Project documentation
+├── setup.sh                 # Master interactive installation & provisioning script
+├── README.md                # Project documentation and operational guide
 ├── caddy/
-│   ├── compose.yaml         # Caddy Docker Compose configuration
-│   └── Caddyfile            # Caddy reverse proxy rules & SSL definitions
+│   ├── compose.yaml         # Caddy Docker Compose configuration (Ports 80/443)
+│   └── Caddyfile            # Caddy reverse proxy routing rules & SSL configs
 ├── n8n/
-│   └── compose.yaml         # n8n workflow engine Docker Compose configuration
+│   └── compose.yaml         # n8n Docker Compose configuration (User 1000:1000)
 ├── portainer/
 │   └── compose.yaml         # Portainer CE Docker Compose configuration
 └── wgeasy/
-    └── compose.yaml         # WG-Easy WireGuard Docker Compose configuration
+    └── compose.yaml         # WG-Easy WireGuard VPN Docker Compose configuration
 ```
 
 ---
 
-## 🔧 Managing Your Services
+## 🔧 Operational & Management Guide
 
-All services are organized in independent modular directories. You can manage any individual service using standard `docker compose` commands:
+Each service is modular and located in its own directory. Manage individual services using standard Docker Compose commands:
 
-### Restart a Specific Service
+### Start / Stop / Restart Services
+
 ```bash
-cd /opt/docker/n8n      # Or your local cloned repo directory
-docker compose restart
-```
+# Navigate to the service folder
+cd caddy      # or n8n, portainer, wgeasy
 
-### View Live Logs
-```bash
-cd /opt/docker/caddy
+# Check status
+docker compose ps
+
+# View live logs
 docker compose logs -f
+
+# Restart service
+docker compose restart
+
+# Stop service
+docker compose down
+
+# Start service in background
+docker compose up -d
 ```
 
-### Update a Service Image
+---
+
+### Updating Containers to Latest Versions
+
 ```bash
-cd /opt/docker/portainer
+cd /path/to/docker/n8n
 docker compose pull
 docker compose up -d
 ```
 
-### Reload Caddy Configuration Without Downtime
-```bash
-docker exec -w /etc/caddy caddy caddy reload
-```
+---
+
+### Adding New Reverse Proxy Domains to Caddy
+
+To proxy any new service or website with automatic SSL:
+
+1. Open `caddy/Caddyfile`:
+   ```bash
+   nano caddy/Caddyfile
+   ```
+2. Add your domain block:
+   ```caddy
+   app.yourdomain.com {
+       reverse_proxy container_name:port
+   }
+   ```
+3. Reload Caddy without downtime:
+   ```bash
+   docker exec -w /etc/caddy caddy caddy reload
+   ```
 
 ---
 
-## 🔒 Security Best Practices
+## 💡 Post-Installation Notes & Tips
 
-- **WireGuard Web Dashboard**: Remember to set an administrative password for WG-Easy by adding `PASSWORD_HASH` or `PASSWORD` in `wgeasy/compose.yaml`.
-- **WireGuard Host IP**: For external VPN connections to connect properly, set `- WG_HOST=YOUR_PUBLIC_SERVER_IP` under the `environment` section of `wgeasy/compose.yaml`.
-- **First Login to Portainer**: Open the Portainer web UI immediately after deployment to create the initial admin user before the setup timeout expires.
+- **Portainer Initial Setup**: Open `https://portainer.yourdomain.com` (or `http://SERVER_IP:9000` via SSH tunnel) immediately after installation to set up your primary admin account before the setup window times out.
+- **WireGuard Configuration**:
+  - To configure your public server IP for client configs, set `- WG_HOST=YOUR_PUBLIC_IP` in `wgeasy/compose.yaml`.
+  - To set an admin password for the web dashboard, set `PASSWORD` or `PASSWORD_HASH` in `wgeasy/compose.yaml`.
+- **Applying Group Changes**: If running Docker commands without `sudo` returns a permission denied error, log out and log back in, or run:
+  ```bash
+  newgrp docker
+  ```
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
